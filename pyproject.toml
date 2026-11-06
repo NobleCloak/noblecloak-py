@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "noblecloak"
+version = "0.0.0"
+description = "noblecloak"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [{ name = "NobleCloak" }]
+requires-python = ">=3.12"
+dependencies = []
+classifiers = ["Development Status :: 1 - Planning"]
+
+[project.urls]
+Repository = "https://github.com/NobleCloak/noblecloak-py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/NobleCloak governed approvals for Python: the common library (Python counterpart of @noblecloak/client)."]

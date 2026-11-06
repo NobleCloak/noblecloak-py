@@ -1,0 +1,45 @@
+# Publishes the package to PyPI through trusted publishing (OIDC). PyPI's pending publisher names this
+# repository, this file (publish.yml) and the `pypi-publish` environment. That environment requires a reviewer
+# and deploys only from main and v* tags, so no other job, branch or file can mint a publish token.
+# Run by hand only. The build job holds no write scope; the publish job installs nothing and holds only id-token.
+name: publish
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    name: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: uv build
+      - run: cd dist && sha256sum * | tee SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi-publish
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - run: rm dist/SHA256SUMS
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
