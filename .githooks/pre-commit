@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs the private-dependency guard before every commit (CONTRIBUTING.md, "Local gate").
+# Enable it once per clone with: git config core.hooksPath .githooks
+exec uv run --locked python scripts/check_private_deps.py

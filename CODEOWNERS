@@ -1,0 +1,5 @@
+# Default owner for everything in the repository.
+*                @dmcnelis
+
+# The record of the contract this client is built against.
+/contract.json   @dmcnelis

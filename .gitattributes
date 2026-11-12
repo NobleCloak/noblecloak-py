@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# The release runbook is maintainer-only: `git archive` leaves it out of the public export.
+RELEASING.md export-ignore

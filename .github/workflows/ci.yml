@@ -1,0 +1,111 @@
+# Two runners per pull request and per push to main, no matrix: GitHub Actions minutes are metered.
+# `gate` is what a developer runs locally (ruff, pyright, pytest with the coverage floor, the private-dependency
+# guard) plus actionlint over the workflows. It installs the pinned @noblecloak/spec first, because the digest tests
+# read its corpus from conformance/node_modules and a missing corpus fails them.
+# `e2e / mock` installs the pinned @noblecloak/spec from the public npm registry, starts and health-checks its
+# `nc-mock` on port 8787, and runs the end-to-end tests (`pytest -m e2e`) against it: the approval flow, and the
+# differential between the Python and the TypeScript argument digest. Those tests also start mocks of their own, each
+# with one `--break`, to show that they go red. The default `pytest` of the `gate` job leaves the e2e tests out.
+# Neither job is handed a token: Python installs from pypi.org and the spec package from registry.npmjs.org.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: 0.11.9
+          enable-cache: false
+      - run: uv sync --locked
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: conformance/package.json
+      - name: Install the pinned spec package
+        working-directory: conformance
+        run: bun install --frozen-lockfile
+      - run: uv run --frozen ruff check
+      - run: uv run --frozen ruff format --check
+      - run: uv run --frozen pyright
+      # Includes the coverage floor (branch coverage, 90%) from pyproject.toml.
+      - run: uv run --frozen pytest
+      - run: uv run --frozen python scripts/check_private_deps.py
+      # The sync token source and the sync client are generated from their async sources; fail when one is not what the
+      # generator writes.
+      - run: uv run --frozen python scripts/generate_sync.py --check
+      # The models are generated from the pinned spec's openapi.public.yaml (installed above); fail when they are not
+      # what the generator writes from it.
+      - run: uv run --frozen python scripts/generate_models.py --check
+      - name: actionlint
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 # 1.7.12
+        with:
+          args: -color
+
+  e2e-mock:
+    name: e2e / mock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: conformance/package.json
+      - name: Install the pinned spec package
+        working-directory: conformance
+        run: bun install --frozen-lockfile
+      # The bin from the frozen install (its shebang runs it under bun), not `bun x`, which would look up a package
+      # named `nc-mock` on the npm registry if the local bin were missing. That name is not ours.
+      - name: Start nc-mock
+        working-directory: conformance
+        run: |
+          ./node_modules/.bin/nc-mock --port 8787 > "$RUNNER_TEMP/nc-mock.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/nc-mock.pid"
+      - name: Wait for nc-mock to answer
+        run: |
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:8787/.well-known/jwks.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "nc-mock did not answer within 30 seconds" >&2
+          cat "$RUNNER_TEMP/nc-mock.log" >&2
+          exit 1
+      - name: nc-mock serves its test tokens
+        run: curl --fail --silent --output /dev/null http://127.0.0.1:8787/__mock/tokens
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: 0.11.9
+          enable-cache: false
+      - run: uv sync --locked
+      # No coverage here: the floor belongs to the `gate` job's run of the unit tests.
+      - name: End-to-end tests
+        env:
+          NOBLECLOAK_E2E_URL: http://127.0.0.1:8787
+        run: uv run --frozen pytest -m e2e --no-cov
+      - name: Stop nc-mock
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/nc-mock.pid")" || true
