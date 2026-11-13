@@ -1,0 +1,39 @@
+# Every dependency is pinned exactly (pyproject.toml, uv.lock, conformance/package.json, conformance/bun.lock),
+# so a Dependabot pull request (or a hand bump that regenerates the lock) is the only way one moves. There is
+# deliberately no `allow:` block: an allowlist hides every dependency it does not name. The github-actions
+# ecosystem moves the actions in `.github/workflows/`, which are pinned by commit SHA with a `# vX.Y.Z` comment.
+# The actionlint image is pinned by digest with a `# X.Y.Z` comment; whether Dependabot moves a `docker://`
+# digest is unverified, so bump it by hand if no pull request does. Two pins sit outside what these ecosystems
+# update: the uv version in ci.yml (`version:` of astral-sh/setup-uv) and the bun version
+# (`packageManager` in conformance/package.json); bump them by hand.
+# conformance/ has no entry on purpose: its one dependency is the contract's spec pin, and moving it is a contract
+# change (contract.json), not a routine bump.
+# `tests/test_repo_policy.py` checks that every pin and comment has one of those forms.
+#
+# One pull request per ecosystem per month, grouped, and at most three open at a time, so a month costs at most
+# a handful of CI builds, not one build per dependency.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    open-pull-requests-limit: 3
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: uv
+    directory: /
+    open-pull-requests-limit: 3
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+      major:
+        update-types: [major]

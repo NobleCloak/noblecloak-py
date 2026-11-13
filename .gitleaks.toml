@@ -1,0 +1,19 @@
+# Secret scan for this repository: gitleaks' default rules. CI does not run gitleaks (the private-dependency guard
+# scans the tree for PyPI, npm and GitHub tokens there). To scan the tree, or the git history:
+#   gitleaks dir --config .gitleaks.toml .
+#   gitleaks git --config .gitleaks.toml .
+# The only exceptions are two fake values planted in tests to prove that errors never echo a secret. Each entry allows
+# one exact, anchored value and nothing else; tests/test_repo_policy.py pins the list. An entry names no path: with
+# gitleaks 8.30.1 a `paths` entry allows every finding in that file, even under `condition = "AND"`.
+title = "noblecloak-py"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "A fake resume token, planted in tests/test_client_api.py to prove a validation error never echoes it."
+regexes = ['''^rt\-SECRET\-0123456789$''']
+
+[[allowlists]]
+description = "A fake secret-shaped field value, planted in tests/test_sp_credential.py to prove the parser refuses it."
+regexes = ['''^hunter2\-planted$''']
