@@ -16,9 +16,9 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "cryptography>=50.0.0,<51",
-  "httpx>=0.25.1,<0.29",
-  "idna>=3.15,<4",
+  "cryptography>=50.0.2,<51",
+  "httpx>=0.28.1,<0.29",
+  "idna>=3.20,<4",
   "pydantic>=2.8.0,<3",
   "rfc8785>=0.1.4,<0.2",
 ]
@@ -29,7 +29,7 @@ Repository = "https://github.com/NobleCloak/noblecloak-py"
 [dependency-groups]
 dev = [
   "datamodel-code-generator==0.92.0",
-  "hypothesis==6.152.0",
+  "hypothesis==6.170.15",
   "packaging==26.3",
   "pyright==1.1.414",
   "pytest==9.2.0",
